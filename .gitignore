@@ -1,0 +1,7 @@
+*.pt
+*.png
+/data
+/__pycache__
+.ipynb_checkpoints/
+.vscode/
+/testdata
