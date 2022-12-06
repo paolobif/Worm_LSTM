@@ -68,10 +68,6 @@ def non_max_suppression_post(outputs: np.ndarray, overlapThresh, counts=False):
 
 
 class CSV_Reader():
-    frame_interval = 100   # Frame intervals to check for stagnant worms
-    step = 1  # Frame step within each interval
-    prevalence = 0.3  # Fraction of unchanged bbs needed to be considered "stagnant"
-    padding = 100  # How many frames to pad by to be safe
 
     def __init__(self, csv, vid):
         """ Reads the csv and video and provides useful functions for determining
@@ -101,20 +97,20 @@ class CSV_Reader():
         bbs = bbs[:, 1:5]
         return frame, bbs
 
-    def get_worms_from_end(self, first: int, count: int, nms: float = 0.3):
+    def get_worms_from_end(self, first: int, spread: int, nms: float = 0.3):
         """Cycles through framse in forward from first to last, and fetches the
         bounding boxes.
 
         Args:
             first ([int]): [latest frame you go from]
-            count ([int]): [how many frames forward to track]
+            spread ([int]): [how many frames forward to track]
             nms ([float]): [thresh of overlap for nms]
 
         Returns:
             list of tracked bounding boxes and all the bounding boxes
             in the selected frames.
         """
-        last = first + count
+        last = first + spread
         if (last > self.frame_count - 1):
             print("Please pick an earlier frame")
             last = self.frame_count - 1
@@ -125,8 +121,53 @@ class CSV_Reader():
             all_bbs = np.append(all_bbs, bbs, axis=0)
 
         tracked = non_max_suppression_post(all_bbs, nms)
-        self.tracked = tracked
         return tracked, all_bbs
+
+    def fetch_worms(self, bbs: list, frame_id: int, pad=0, offset=(0, 0)):
+        """Fetches worms in self.tracked by worm id on a given frame_id.
+        Allows for padding and auto padding for worms that are skinny.
+        Args:
+            bbs (list): List of worm ids to be fetched.
+            frame_id (int): Frame from which to fetch worms.
+            pad (int, tuple): Padding in x and y direction. Tuple or Int.
+            offset (tuple): Offset in x and y direction. Tuple.
+            auto (tuple, optional): Auto pads for skinny worms.
+        Returns:
+            _type_: _description_
+        """
+        # Get pad ammount.
+        if type(pad) == int:
+            padX = pad
+            padY = pad
+        else:
+            padX, padY = pad
+
+        # Get the bbs for the frame.
+        ret, frame = self.get_frame(frame_id)
+        height, width = frame.shape[:2]
+
+        if not ret:
+            print(f"Frame {frame_id} not found.")
+            pass
+        # Get worm image for each frame
+        worm_imgs = []
+        for bb in bbs:
+            x, y, w, h = bb.astype(int)
+            x += offset[0]
+            y += offset[1]
+            x, y, w, h = x - padX, y - padY, w + 2*padX, h + 2*padY
+
+            # Set x y lower and upper to account for padding / offset.
+            y_l, y_u = max(0, y), min(height, y + h)
+            x_l, x_u = max(0, x), min(width, x + w)
+
+            worm_img = frame[y_l:y_u, x_l:x_u]
+            worm_imgs.append(worm_img)
+            # worm_img = frame[y:y+h, x:x+w]
+            # worm_imgs.append(worm_img)
+
+        return worm_imgs
+
 
 
 if __name__ == "__main__":
@@ -139,6 +180,8 @@ if __name__ == "__main__":
         a, b = test.get_frame(0)
         a, b = test.get_worms_from_frame(100)
         a, b = test.get_worms_from_end(1400, 10, 0.6)
+        imgs = test.fetch_worms(a, 100, 2)
+        assert len(imgs) == len(a)
         print("CSV_reader test passed!")
 
     csv_reader_test()
