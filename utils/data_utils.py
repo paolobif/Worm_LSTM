@@ -5,7 +5,12 @@ from torch.utils.data import Dataset
 
 import os
 from skimage import io
-import numpy as np
+
+
+transform = transforms.Compose([transforms.ToPILImage(),
+                                transforms.Grayscale(num_output_channels=3),
+                                transforms.Resize((244, 244)),
+                                transforms.ToTensor()])
 
 
 class LstmLoader(Dataset):
@@ -58,7 +63,6 @@ class LstmLoader(Dataset):
             image = self.feature_extractor(image)
 
         return image
-
 
     def __len__(self):
         return len(self.data)

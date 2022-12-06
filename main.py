@@ -1,10 +1,12 @@
 import torch
 import cv2
 import numpy as np
+import time
 
-from utils.yolo_utils import CSV_Reader
-# from utils.training_utils import test_model
-from utils.data_utils import LstmLoader
+from tqdm import tqdm
+
+from utils.utils import Series_Builder
+from utils.data_utils import LstmLoader, transform
 from model import ResnetLSTM
 
 """
@@ -27,70 +29,68 @@ TODO:
  the histograms or something to try and find the image that is closest to the mean.
 """
 
+device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
-class series_builder(CSV_Reader):
-    """Takes the video and csv path and allows you to the frames for
-    each serries within the video.=
+
+def series_to_model_input(series: list):
+    """Takes single series of 3 images as numpy array and converts
+    it to a tensor stack for the model.
+
+    Args:
+        series (np.array): np array shape (3, x, y, 3)
     """
-    def __init__(self, csv, vid, interval=72, spread=5, nms=0.6):
-        super().__init__(csv, vid)
-        self.interval = interval
-        self.spread = spread
-        self.nms = nms
+    assert len(series) == 3, "invalid series length"
+    transformed = []
+    for i in series:
+        new = transform(i)
+        new = new / 255
+        transformed.append(new)
 
-        # Builds the indecies.
-        self.start = 0 + interval  # First frame
-        self.end = (self.frame_count - spread) // interval * interval  # Last common multiple
+    stack = torch.stack(transformed)
+    stack = stack.to(device=device)
 
-        self.indecies = np.arange(self.start, self.end, self.interval)
+    return stack
 
-    def build_series(self, bbs, pre, cur, post):
-        """Builds a series for t-1, t, t+1 for all the locations specified
-        in bbs. Returns a array of [pre[], cur[], post[]].
 
-        Args:
-            bbs (_type_): _description_
-            pre (_type_): _description_
-            cur (_type_): _description_
-            post (_type_): _description_
-        """
-        # Get pre current and post images for all bbs in bbs.
-        PAD = 5
-        pre_imgs = self.fetch_worms(bbs, pre, pad=PAD)
-        cur_imgs = self.fetch_worms(bbs, cur, pad=PAD)
-        post_imgs = self.fetch_worms(bbs, post, pad=PAD)
-        assert len(pre_imgs) == len(cur_imgs) and len(cur_imgs) == len(post_imgs)
+def process_bulk_series(generator, model):
+    """Takes the series generator, and iterates through all of it passing
+    each sub series through the LSTM. Returns alive and dead counts.
 
-        series = np.array([pre_imgs, cur_imgs, post_imgs], dtype=object)
-        return series
+    - series is the list of stacks within a given frame interval.
+    - within each series are the 3 image stacks for the interval.
 
-    def __len__(self):
-        return len(self.indecies)
+    series --> [[[pre, cur, post], [pre, cur, post], ...], [...], [...]]
+    """
 
-    def __getitem__(self, index: int):
-        cur = self.indecies[index]
-        pre, post = cur - self.interval, cur + self.interval
-        # Gets the bounding boxes from the current frame.
-        bbs, _ = self.get_worms_from_end(first=cur, spread=self.spread, nms=self.nms)
+    timeA = time.time()
+    count = 0
 
-        series = self.build_series(bbs, pre, cur, post)
-        return series
+    exp_preds = []
+    for all_series, _ in tqdm(generator):
+        preds = []
+        # series_count = len(all_series])
+        # if len(all_series) == 0:
+        #     continue
 
-    @staticmethod
-    def save_series(series: list, path: str):
-        """Saves series of images to specified path.
+        for series in all_series:
+            count += 1
+            # print(series.shape)
+            stack = series_to_model_input(series)
+            output = model(stack)
 
-        Args:
-            series (list): list of 3 images.
-            path (str): save path for the image.
-        """
-        try:
-            stack = np.hstack(series)
-            cv2.imwrite(path, stack)
-            return True
-        except Exception:
-            print("Unable to create stack or save stack.")
-            return False
+            if output > 0.5:
+                pred_class = 1
+            elif output < 0.5:
+                pred_class = 0
+
+            preds.append(pred_class)
+        exp_preds.append(preds)
+
+    timeB = time.time()
+
+    print("Process took:", timeB - timeA)
+    print(f"Over: {count} itterations.")
+    return exp_preds
 
 
 if __name__ == "__main__":
@@ -99,9 +99,9 @@ if __name__ == "__main__":
 
     WEIGHTS = "weights/run0/weights12.pt"
 
-    device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
     model = ResnetLSTM().to(device)
     model.load_state_dict(torch.load(WEIGHTS, map_location=device))
     print("Succesfully laoded model to:", device)
 
-
+    test = Series_Builder(test_csv, test_vid, interval=36, spread=1, nms=0.95)
+    outputs = process_bulk_series(test, model)
