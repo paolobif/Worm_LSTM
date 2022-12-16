@@ -52,7 +52,7 @@ def series_to_model_input(series: list):
     return stack
 
 
-def process_bulk_series(generator, model):
+def process_bulk_series(generator, model) -> list:
     """Takes the series generator, and iterates through all of it passing
     each sub series through the LSTM. Returns alive and dead counts.
 
@@ -66,7 +66,8 @@ def process_bulk_series(generator, model):
     count = 0
 
     exp_preds = []
-    for all_series, _ in tqdm(generator):
+    exp_bbs = []
+    for all_series, bbs in tqdm(generator):
         preds = []
         # series_count = len(all_series])
         # if len(all_series) == 0:
@@ -84,13 +85,15 @@ def process_bulk_series(generator, model):
                 pred_class = 0
 
             preds.append(pred_class)
+
         exp_preds.append(preds)
+        exp_bbs.append(bbs)
 
     timeB = time.time()
 
     print("Process took:", timeB - timeA)
     print(f"Over: {count} itterations.")
-    return exp_preds
+    return exp_preds, exp_bbs
 
 
 if __name__ == "__main__":
