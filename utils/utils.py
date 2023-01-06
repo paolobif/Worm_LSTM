@@ -192,27 +192,33 @@ class Series_Builder(CSV_Reader):
     """Takes the video and csv path and allows you to the frames for
     each serries within the video.=
     """
-    def __init__(self, csv: str, vid: str, frequency=72, interval=72, spread=5, nms=0.6, pad=5):
+    def __init__(self, csv: str, vid: str, frequency=72, intervals=[32, 74], spread=5, nms=0.6, pad=5):
         """
         Args:
             csv (str): Path to the yolo csv file.
             vid (str): Path to the raw video file.
             frequency (int, optional): How often the video is sampled..
-            interval (int, optional): (t-interval, t, t+interval).
+            interval (int, list[int]): (t-interval, t, t+interval).
             spread (int, optional): When grabbing multiple frames how many to grab.
             nms (float, optional): NMS for spread.
             pad (int): how much to pad the images by.
         """
         super().__init__(csv, vid)
         self.frequency = frequency
-        self.interval = interval
+        # Set the option to have multiple intervals.
+        if type(intervals) == int:
+            self.intervals = [intervals]
+        else:
+            self.intervals = intervals.sort()
+
         self.spread = spread
         self.nms = nms
         self.pad = pad
 
         # Builds the indecies.
-        self.start = 0 + interval  # First frame
-        self.end = (self.frame_count - spread - interval) // interval * interval  # Last common multiple
+        max_interval = max(self.intervals)
+        self.start = 0 + max_interval  # First frame
+        self.end = (self.frame_count - spread - max_interval) // max_interval * max_interval  # Last common multiple
 
         self.indecies = np.arange(self.start, self.end, self.frequency)
 
@@ -244,13 +250,29 @@ class Series_Builder(CSV_Reader):
         return len(self.indecies)
 
     def __getitem__(self, index: int):
-        cur = self.indecies[index]
-        pre, post = cur - self.interval, cur + self.interval
-        # Gets the bounding boxes from the current frame.
-        bbs, _ = self.get_worms_from_end(first=cur, spread=self.spread, nms=self.nms)
+        """Using the perams specified in init. Builds a bundle of image series
+        that are used to determine the state of the worm. Returns series_list which
+        contains a sublist of three image series and BBs which contains the
+        "cur" bounding boxes specified.
 
-        series = self.build_series(bbs, pre, cur, post)
-        return series, bbs
+        Args:
+            index (int): what "cur" frame to look at (index within indecies list).
+
+        Returns:
+            (list[list[imgs]], list[list[x, y, w, h]]):
+        """
+        cur = self.indecies[index]
+
+        series_list = []
+        for interval in self.intervals:
+            pre, post = cur - interval, cur + interval
+            # Gets the bounding boxes from the current frame.
+            bbs, _ = self.get_worms_from_end(first=cur, spread=self.spread, nms=self.nms)
+
+            series = self.build_series(bbs, pre, cur, post)
+            series_list.append(series)
+
+        return series_list, bbs
 
     def build_video(self, outputs: list, bbs: list, path: str):
         """Takes the predicted outputs, bounding boxes, and save path.
@@ -312,7 +334,7 @@ if __name__ == "__main__":
     def build_series_test():
         test = Series_Builder(test_csv, test_vid, frequency=32)
         cur = test.indecies[0]
-        pre, post = cur - test.interval, cur + test.interval
+        pre, post = cur - test.intervals[0], cur + test.intervals[0]
         bbs, _ = test.get_worms_from_end(first=cur, spread=1, nms=0.98)
         all_series = test.build_series(bbs, pre, cur, post)
 
@@ -321,9 +343,16 @@ if __name__ == "__main__":
         print("✅ Build_series test passed")
         return all_series
 
+    def get_index_test():
+        test = Series_Builder(test_csv, test_vid, frequency=32, intervals=[10, 20])
+        series_list, bbs = test[1]
+        assert len(series_list) == 2
+        print("✅ Get index test passed")
+
     def test_all():
         csv_reader_test()
         build_series_test()
+        get_index_test()
 
         print("✅ All tests passed!")
 

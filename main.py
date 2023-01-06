@@ -52,6 +52,21 @@ def series_to_model_input(series: list):
     return stack
 
 
+def multi_index_batching(series_list, bbs, model) -> list:
+    """Takes a list of series built at different indecies ie. t+-30 and t+-10.
+    Then from smallest interval to the highest. Anything classified as alive
+    gets dropped and dead calls move to the next iterval.
+
+    Args:
+        series_list (list): List[t+-10[series, series], t+-20[series, series]]
+        model (model): lstm model.
+
+    Returns:
+        list: classification for each worm.
+    """
+    pass
+
+
 def process_bulk_series(generator, model) -> list:
     """Takes the series generator, and iterates through all of it passing
     each sub series through the LSTM. Returns alive and dead counts.
@@ -67,7 +82,7 @@ def process_bulk_series(generator, model) -> list:
 
     exp_preds = []
     exp_bbs = []
-    for all_series, bbs in tqdm(generator):
+    for series_list, bbs in tqdm(generator):
         preds = []
         # series_count = len(all_series])
         # if len(all_series) == 0:
@@ -106,5 +121,5 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(WEIGHTS, map_location=device))
     print("Succesfully laoded model to:", device)
 
-    test = Series_Builder(test_csv, test_vid, interval=36, spread=1, nms=0.95)
+    test = Series_Builder(test_csv, test_vid, intervals=[36], spread=1, nms=0.95)
     outputs = process_bulk_series(test, model)
