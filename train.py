@@ -140,7 +140,7 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     logging.info(
-        f"""Starting training at {date.today()}
+        f"""\n\nStarting training at {date.today()}
             Source: {data_path}
             Save: {weights_path}
             Epochs: {epochs}

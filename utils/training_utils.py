@@ -43,7 +43,12 @@ def test_model(model, data, device):
             real.append(real_class)
             pred.append(pred_class)
 
-    tn, fp, fn, tp = confusion_matrix(real, pred).ravel()
+    # print(real, pred)
+    matrix = confusion_matrix(real, pred).ravel()
+    # Quick fix to account for when the test is perfect...
+    if len(matrix) != 4:
+        matrix = [1, 1, 1, 1]
+    tn, fp, fn, tp = matrix
     return (tn, fp, fn, tp)
 
 
@@ -51,6 +56,7 @@ def convert_confusion(matrix):
     # Matrix is array of: [tn, fp, fn, tp]
     # Returns fractional accuracy for total, dead, and alive
     tn, fp, fn, tp = matrix
+    print(matrix)
     accuracy = (tn + tp) / sum(matrix)
     dead_accuracy = tn / (tn + fn)
     alive_accuracy = tp / (fp + tp)
