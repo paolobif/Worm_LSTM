@@ -2,6 +2,7 @@ import os
 import torch
 import logging
 from tqdm import tqdm
+from datetime import date
 import matplotlib.pyplot as plt
 
 from utils.data_utils import LstmLoader
@@ -49,16 +50,26 @@ def log_dataset(total: int, train: int, test: int):
 
 
 def log_training(params):
-    logging.info(
-        f"Epoch: {params['epoch']} \
-        - Acc: {params['accuracy']} \
-        - A_acc: {params['alive']} \
-        - D_acc: {params['dead']} \
-        - Loss: {params['loss']}"
-    )
+    log_str = f"Epoch: {params['epoch']} \
+              - Acc: {params['accuracy']} \
+              - A_acc: {params['alive']} \
+              - D_acc: {params['dead']} \
+              - Loss: {params['loss']}"
+    print(log_str)
+    logging.info(log_str)
 
-# def plot_training(loss_totals, test_totals):
-#     f = plt.figure()
+
+def plot_training(loss_totals, test_totals):
+    f, ax = plt.subplots()
+    ax.plot(test_totals, color="red", label="Test Accuracy")
+    ax.set_ylabel("Test Accuracy")
+    ax2 = ax.twinx()
+    ax2.plot(loss_totals, color="blue", label="Loss")
+    ax2.set_ylabel("Loss")
+    ax.legend()
+    ax2.legend()
+    return f
+
 
 def train(train_data, test_data, epochs: int, device, save_path):
     loss_totals = []
@@ -86,24 +97,19 @@ def train(train_data, test_data, epochs: int, device, save_path):
         accuracy, d_accuracy, a_accuracy = convert_confusion(matrix)
         loss = loss_total / len(train_data)
 
-        print(
-            f"Epoch {epoch}/{epochs} \
-            - Test Accuracy: {accuracy} \
-            - A&D: {a_accuracy}, {d_accuracy} \
-            - Loss: {loss}"
-        )
-
         log_params = {
             "epoch": epoch,
-            "accuracy": accuracy,
-            "alive": a_accuracy,
-            "dead": d_accuracy,
+            "accuracy": round(accuracy, 4),
+            "alive": round(a_accuracy, 4),
+            "dead": round(d_accuracy, 4),
             "loss": loss
         }
         log_training(log_params)
 
         loss_totals.append(loss_total / len(train_data))
         test_totals.append(accuracy)
+        figure = plot_training(loss_totals, test_totals)
+        figure.savefig(os.path.join(save_path, "plot.png"))
 
         # Save weights
         torch.save(model.state_dict(), os.path.join(save_path, f"weights{epoch}.pt"))
@@ -133,6 +139,14 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    logging.info(
+        f"""Starting training at {date.today()}
+            Source: {data_path}
+            Save: {weights_path}
+            Epochs: {epochs}
+            Device: {device}
+        """
+    )
     # Setup training Data
     test_data, train_data = build_dataset(data_loader)
 
