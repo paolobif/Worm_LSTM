@@ -52,19 +52,35 @@ def series_to_model_input(series: list):
     return stack
 
 
-def multi_index_batching(series_list, bbs, model) -> list:
+def multi_index_batching(series_list, model) -> list:
     """Takes a list of series built at different indecies ie. t+-30 and t+-10.
     Then from smallest interval to the highest. Anything classified as alive
     gets dropped and dead calls move to the next iterval.
 
     Args:
         series_list (list): List[t+-10[series, series], t+-20[series, series]]
+        bbs (list): List of bounding boxes from SeriesBuilder obj.
         model (model): lstm model.
 
     Returns:
         list: classification for each worm.
     """
-    pass
+
+    # Initialize prediction dictionary with respective values.
+    preds = {i: 0 for i in range(len(series_list[0]))}
+
+    for stack in series_list:
+        # Stack is a flight of 3 image series.
+        for key, val in preds.items():
+            if val == 0:  # Process only the bbs where the worm is called as dead. Ignore alive.
+                # Reprocess only ones called dead.
+                series = stack[key]
+                input = series_to_model_input(series)
+                output = model(input)
+                pred_class = 1 if output > 0.5 else 0
+                preds[key] = pred_class
+
+    return preds.values()
 
 
 def process_bulk_series(generator, model) -> list:
@@ -83,23 +99,7 @@ def process_bulk_series(generator, model) -> list:
     exp_preds = []
     exp_bbs = []
     for series_list, bbs in tqdm(generator):
-        preds = []
-        # series_count = len(all_series])
-        # if len(all_series) == 0:
-        #     continue
-
-        for series in all_series:
-            count += 1
-            # print(series.shape)
-            stack = series_to_model_input(series)
-            output = model(stack)
-
-            if output > 0.5:
-                pred_class = 1
-            elif output < 0.5:
-                pred_class = 0
-
-            preds.append(pred_class)
+        preds = multi_index_batching(series_list, model)
 
         exp_preds.append(preds)
         exp_bbs.append(bbs)

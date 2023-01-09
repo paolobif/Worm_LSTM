@@ -16,8 +16,8 @@ def convert_confusion(matrix):
 
 
 if __name__ == "__main__":
-    WEIGHTS = "weights/run0/weights12.pt"
-    DATA_PATH = "test_data/fake2"
+    WEIGHTS = "weights/training_f2/weights75.pt"
+    DATA_PATH = "data/validation"
     # DATA_PATH = "data/validation"
 
     data = LstmLoader(DATA_PATH)

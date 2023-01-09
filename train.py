@@ -71,13 +71,17 @@ def plot_training(loss_totals, test_totals):
     return f
 
 
-def train(train_data, test_data, epochs: int, device, save_path):
+def train(train_data, test_data, epochs: int, device, lr, save_path):
+    model = ResnetLSTM().to(device)
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
+    
     loss_totals = []
     test_totals = []
 
     for epoch in range(epochs):
         loss_total = 0
-        for series, label in tqdm(train_data):
+        for series, label in train_data:
             model.zero_grad()
 
             series = series.to(device)
@@ -87,7 +91,7 @@ def train(train_data, test_data, epochs: int, device, save_path):
             output = model(series).squeeze()
             #  print(output, label)
             loss = criterion(output, label.float())
-            loss_total += loss
+            loss_total += loss.cpu().detach().numpy()
             #  print(output, label, loss)
             loss.backward()
             optimizer.step()
@@ -108,8 +112,10 @@ def train(train_data, test_data, epochs: int, device, save_path):
 
         loss_totals.append(loss_total / len(train_data))
         test_totals.append(accuracy)
-        figure = plot_training(loss_totals, test_totals)
-        figure.savefig(os.path.join(save_path, "plot.png"))
+        # figure = plot_training(loss_totals, test_totals)
+        # figure.savefig(os.path.join(save_path, "plot.png"))
+        del loss
+        del output
 
         # Save weights
         torch.save(model.state_dict(), os.path.join(save_path, f"weights{epoch}.pt"))
@@ -117,7 +123,7 @@ def train(train_data, test_data, epochs: int, device, save_path):
 
 
 if __name__ == "__main__":
-    data_path = "data/training_real"
+    data_path = "data/training_f2"
     weights_path = "weights/training_f2"
 
     # File checks and logging.
@@ -128,7 +134,6 @@ if __name__ == "__main__":
         format='%(levelname)s - %(message)s'
     )
 
-    data_loader = LstmLoader(data_path)
 
     # Settings
     training_split = 0.15  # What fraction to use as test data.
@@ -148,11 +153,7 @@ if __name__ == "__main__":
         """
     )
     # Setup training Data
+    data_loader = LstmLoader(data_path)
     test_data, train_data = build_dataset(data_loader)
 
-    # Setup Model
-    model = ResnetLSTM().to(device)
-    criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, betas=(0.9, 0.999))
-
-    train(train_data, test_data, epochs, device, weights_path)
+    train(train_data, test_data, epochs, device, learning_rate, weights_path)

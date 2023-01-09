@@ -209,7 +209,8 @@ class Series_Builder(CSV_Reader):
         if type(intervals) == int:
             self.intervals = [intervals]
         else:
-            self.intervals = intervals.sort()
+            intervals.sort()
+            self.intervals = intervals
 
         self.spread = spread
         self.nms = nms
@@ -255,6 +256,10 @@ class Series_Builder(CSV_Reader):
         contains a sublist of three image series and BBs which contains the
         "cur" bounding boxes specified.
 
+        * series_list: is respective list of series. [index1, index2]
+            index1: [[series1], [series2], ...]
+            index2: [[series1], [series2], ...]
+
         Args:
             index (int): what "cur" frame to look at (index within indecies list).
 
@@ -283,8 +288,9 @@ class Series_Builder(CSV_Reader):
             bbs (list): List of bounding boxes. First index is frame (like outputs).
             path (str): Save path for the video.
         """
-        w = int(self.video.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h = int(self.video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        # TODO: Currently not using the input video shape in determining output shape.
+        # w = int(self.video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        # h = int(self.video.get(cv2.CAP_PROP_FRAME_WIDTH))
 
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
         writer = cv2.VideoWriter(path, fourcc, 3, (1920, 1080), True)
@@ -332,13 +338,12 @@ if __name__ == "__main__":
         print("✅ CSV_reader test passed!")
 
     def build_series_test():
-        test = Series_Builder(test_csv, test_vid, frequency=32)
+        test = Series_Builder(test_csv, test_vid, frequency=32, intervals=1)
         cur = test.indecies[0]
         pre, post = cur - test.intervals[0], cur + test.intervals[0]
         bbs, _ = test.get_worms_from_end(first=cur, spread=1, nms=0.98)
         all_series = test.build_series(bbs, pre, cur, post)
-
-        test_save = test.save_series(all_series[8], "test.png")
+        test_save = test.save_series(all_series[2], "test.png")
         assert test_save is True
         print("✅ Build_series test passed")
         return all_series
