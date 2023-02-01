@@ -67,13 +67,16 @@ def multi_index_batching(series_list, model) -> list:
     """
 
     # Initialize prediction dictionary with respective values.
-    preds = {i: 0 for i in range(len(series_list[0]))}
+    # if ignore = 1 reprocess only alive worms.
+    # if ignore = 0 reprocess only dead worms.
+    IGNORE = 1
+    preds = {i: IGNORE for i in range(len(series_list[0]))}
 
     for stack in series_list:
         # Stack is a flight of 3 image series.
         for key, val in preds.items():
-            if val == 0:  # Process only the bbs where the worm is called as dead. Ignore alive.
-                # Reprocess only ones called dead.
+            if val == IGNORE:
+                # Reprocess only ones called Alive.
                 series = stack[key]
                 input = series_to_model_input(series)
                 output = model(input)
@@ -101,7 +104,7 @@ def process_bulk_series(generator, model) -> list:
     for series_list, bbs in tqdm(generator):
         preds = multi_index_batching(series_list, model)
 
-        exp_preds.append(preds)
+        exp_preds.append(list(preds))
         exp_bbs.append(bbs)
 
     timeB = time.time()

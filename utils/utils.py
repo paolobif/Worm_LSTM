@@ -192,7 +192,7 @@ class Series_Builder(CSV_Reader):
     """Takes the video and csv path and allows you to the frames for
     each serries within the video.=
     """
-    def __init__(self, csv: str, vid: str, frequency=72, intervals=[32, 74], spread=5, nms=0.6, pad=5):
+    def __init__(self, csv: str, vid: str, frequency=72, intervals=[32, 74], spread=1, nms=0.95, pad=5):
         """
         Args:
             csv (str): Path to the yolo csv file.
