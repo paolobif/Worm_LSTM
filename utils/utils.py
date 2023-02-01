@@ -88,7 +88,7 @@ def draw_from_output(img, bbs, preds, col=(255, 255, 0), text=None):
 
 class CSV_Reader():
 
-    def __init__(self, csv, vid):
+    def __init__(self, csv: str, vid: str):
         """ Reads the csv and video and provides useful functions for determining
         time of death"""
         self.csv = csv
